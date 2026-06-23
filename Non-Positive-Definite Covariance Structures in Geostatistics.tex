@@ -1,0 +1,1327 @@
+\RequirePackage{fix-cm}
+%
+\documentclass[smallextended]{svjour3}   
+\smartqed   
+%----------------------------------------------------------------------
+% Packages
+% ----------------------------------------------------------------------
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+\usepackage{mathptmx}      
+
+\usepackage{enumerate}
+\usepackage[misc]{ifsym}
+\usepackage{float}
+ 
+\usepackage[authoryear]{natbib}
+\bibpunct{(}{)}{;}{a}{,}{,}
+
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{url}
+% ----------------------------------------------------------------------
+% Journal name
+% ----------------------------------------------------------------------
+\journalname{Mathematical Geosciences}
+
+% ----------------------------------------------------------------------
+% Macros and operators
+% ----------------------------------------------------------------------
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\T}{\top}
+\newcommand{\1}{\mathbf{1}}
+
+\DeclareMathOperator{\Cov}{Cov}
+\DeclareMathOperator{\diag}{diag}
+
+% ----------------------------------------------------------------------
+% Theorem-like environments: upright body (no italics)
+% ----------------------------------------------------------------------
+
+\let\oldtheorem\theorem
+\let\endoldtheorem\endtheorem
+\renewenvironment{theorem}{\oldtheorem\upshape}{\endoldtheorem}
+
+\let\oldlemma\lemma
+\let\endoldlemma\endlemma
+\renewenvironment{lemma}{\oldlemma\upshape}{\endoldlemma}
+
+\let\oldproposition\proposition
+\let\endoldproposition\endproposition
+\renewenvironment{proposition}{\oldproposition\upshape}{\endoldproposition}
+
+\let\oldcorollary\corollary
+\let\endoldcorollary\endcorollary
+\renewenvironment{corollary}{\oldcorollary\upshape}{\endoldcorollary}
+
+\let\oldremark\remark
+\let\endoldremark\endremark
+\renewenvironment{remark}{\oldremark\upshape}{\endoldremark}
+
+\let\oldproof\proof
+\let\endoldproof\endproof
+\renewenvironment{proof}{\oldproof\upshape}{\endoldproof}
+
+% ----------------------------------------------------------------------
+% Document
+% ----------------------------------------------------------------------
+\begin{document}
+	
+	\title{Non-Positive-Definite Covariance Structures in Geostatistics: Theory, Diagnostics, and Implications for Kriging}
+	\titlerunning{Non-Positive-Definite Covariance Structures}
+\author{
+	Francisco Jose Maturana
+}
+\authorrunning{F. J. Maturana}
+\institute{
+	Francisco Jose Maturana \at
+	Perth, Australia \\
+	\email{francisco.j.maturana@proton.me}
+}	
+\date{}
+
+\maketitle
+	
+	\begin{abstract}
+		Classical geostatistical models enforce global positive semi-definiteness of covariance or variogram structures, guaranteeing that every finite collection of random field values admits a valid joint distribution. 
+		In practical workflows, however, covariance matrices are often assembled from approximate fits, local adjustments, and numerical approximations, and may fail to be positive semi-definite without causing any apparent instability in prediction or uncertainty quantification. 
+		This paper develops a framework for working systematically with such non-positive-definite covariance structures.
+		We characterise a hierarchy of operational admissibility conditions, ranging from global positive semi-definiteness to weaker requirements that only involve the subspaces relevant for linear prediction.
+		We then study linear prediction with indefinite covariance matrices, derive sufficient conditions under which ordinary and universal kriging continue to operate reliably, and show that, in the prediction settings considered here, negative eigen-directions that lie mostly outside prediction-relevant subspaces tend to have limited impact on kriging weights and prediction variances, as quantified by our subspace-based diagnostics.
+		Building on this analysis, we propose diagnostics for ``kriging-safe'' non-positive-definite covariance structures and introduce minimal adjustment schemes that enforce positive semi-definiteness only where it is needed for the task at hand.
+		Examples illustrate how the proposed framework permits flexible modelling of boundary effects, patchwise variograms, and numerically indefinite sample covariances while retaining stability of prediction.
+		Overall, the results support a more nuanced view of positive semi-definiteness in spatial statistics, suggesting that global admissibility is best seen as one element in a hierarchy of task dependent conditions rather than as the only criterion for assessing covariance structures.
+	\end{abstract}
+	
+\noindent\textbf{Keywords:} spatial random fields; covariance modelling; kriging; positive semi-definiteness; indefinite kernels.	
+
+% ----------------------------------------------------------------------
+\section{Introduction}
+% ----------------------------------------------------------------------
+	
+%   
+Second-order structure plays a central role in geostatistical modelling, with dependence between spatial observations typically represented through covariance or variogram functions \citep[e.g.][]{goovaerts1997,cressie1993}. In the standard formulation, these functions are required to generate positive semi-definite (PSD) covariance matrices for all finite sets of locations, ensuring that the corresponding random field admits a coherent probabilistic interpretation \citep{Bochner2005,yaglom1987}. This global admissibility requirement underpins much of the classical theory for Gaussian random fields and kriging, and motivates the widespread use of parametric covariance families whose positive definiteness is guaranteed by construction. 
+ 
+Practical workflows, however, rarely construct covariance structure directly from a single globally admissible model \citep[e.g.][]{cressie1993}. Instead, analysts combine empirical variograms, local model fits, boundary adjustments, and numerical approximations to assemble covariance matrices on specific sampling designs \citep{isaaks1989,chilesdelfiner2012,Olea1999}. Such matrices can potentially fail to be PSD, because small negative eigenvalues may arise from sampling noise or rounding, and deliberate modifications near interfaces or subregion boundaries may introduce more substantial departures from admissibility \citep{Higham1988}. Despite this, standard geostatistical procedures, in particular linear prediction via kriging, often continue to behave in a stable and interpretable manner in routine resource-evaluation workflows \citep{chilesdelfiner2012,armstrong1998}.
+
+The discrepancy between global admissibility conditions and the local demands of specific tasks motivates a more flexible perspective (see also the discussions of model choice and practical covariance construction in \citealp{stein1999,chilesdelfiner2012}). In many applications, the primary objective is to construct predictors for a fixed set of locations and to quantify their uncertainty \citep{cressie1993,armstrong1998}. For such tasks, it is not necessarily obvious that enforcing full PSD  of the covariance matrix on the sampling design, let alone global PSD of a covariance function over the entire domain, is the only way to ensure reasonable prediction; related discussions of prediction-focused model choice can be found in \citet{stein1999}. Rather, what matters is that the particular linear systems and quadratic forms entering the kriging problem are well behaved, in the sense that kriging systems are solvable and the resulting prediction variances remain interpretable for the decisions at hand \citep{goovaerts1997,chilesdelfiner2012}.
+
+This paper develops a framework for analysing and exploiting this gap between global and operational requirements. We study symmetric, not necessarily positive semi-definite, covariance matrices as primary modelling objects, and ask when such matrices remain ``safe'' for tasks such as ordinary kriging (OK) or universal kriging (UK). Our focus is on characterising those aspects of indefiniteness that are irrelevant for prediction, and on designing minimal adjustment schemes that enforce positive semi-definiteness only where it is required. The key idea is to organise the analysis around prediction subspaces that collect trend constraints and covariance vectors for the locations of interest, and to separate the behaviour of the covariance structure on these subspaces from its behaviour on their orthogonal complements.
+
+We introduce a hierarchy of admissibility notions for covariance structures, ranging from global PSD over the entire domain, through PSD on a fixed sampling design, to weaker conditions that involve only the subspace spanned by prediction functionals and trend constraints. We also study linear prediction with indefinite covariance matrices, deriving sufficient conditions under which OK and UK remain useful, and establishing a variance decomposition that isolates the contribution of directions orthogonal to the prediction subspace. This shows that, at least in the examples considered here, negative eigen-directions that lie mostly outside prediction-relevant subspaces tend to have only a modest effect on kriging weights and prediction variances in the settings of interest. Finally, we propose diagnostics and adjustment schemes that quantify and control the impact of indefiniteness on prediction, allowing practitioners to work with non-PSD structures while retaining stability guarantees.
+
+From a practical perspective, the covariance structures used in geostatistical workflows, built from empirical variograms, patchwise models, and boundary adjustments, often depart from the ideal of a single globally admissible covariance function, and may yield covariance matrices that are only approximately PSD \citep[e.g.][]{chilesdelfiner2012}. Examples include locally fitted variograms across geological domains with different sills and ranges \citep{Olea1999}, boundary corrections along faults or contacts and the merging of independently modelled regions into a single prediction grid \citep{armstrong1998}, covariance matrices built from sparse or noisy empirical variograms, and numerical approximations introduced for conditioning or scalability in large-scale resource estimation \citep[see, e.g.,][]{chilesdelfiner2012,goovaerts1997,chilesdelfiner2012}.  These steps are often essential for representing geological heterogeneity and for making large problems computationally tractable, but together they can push the resulting covariance structure outside the cone of globally PSD matrices. The framework developed here is intended to handle precisely these situations, assessing when such matrices are safe for prediction and when minimal, task-focused adjustment is required.
+
+From a broader perspective, the results suggest a reinterpretation of PSD in spatial statistics. Rather than treating global admissibility as an absolute requirement on models, we view it as one point in a spectrum of task-dependent conditions. In routine geostatistical workflows, it may be sufficient to ensure that covariance structure is well behaved with respect to the specific prediction and estimation tasks at hand, allowing greater flexibility in representing complex spatial phenomena \citep[cf.][]{stein1999}. 
+
+On the theoretical side, the central result is a variance-decomposition theorem (Theorem~\ref{thm:variance-decomp}) which shows that, for a given design and constraint structure, the contribution of $C$ to kriging can be separated into a prediction term that depends only on its restriction to a low-dimensional prediction subspace $U$ and a residual term that involves only $U^\perp$. This decomposition underpins a new metric we call the kriging-safety index $\kappa(C,U)$ and the subspace-constrained correction schemes developed later in the paper.
+
+The framework developed here should not be interpreted as a replacement for valid covariance modelling. Rather, it is intended as a diagnostic and operational framework for situations in which covariance information has already departed from strict positive semi definiteness through approximation, local adjustment, numerical error, or model assembly, and one wishes to assess whether stable prediction is still possible and, if needed, to apply minimal task focused correction.
+
+The remainder of the paper is organised as follows. Section~\ref{sec:literature} reviews related work on indefinite kernels, reproducing kernel Krein spaces, and nearest positive semi-definite approximations, and positions the present contribution within geostatistics and Mathematical Geosciences.  Section~\ref{sec:admissibility} introduces a hierarchy of admissibility notions for covariance structures and defines the concept of kriging-safe covariance matrices. Section~\ref{sec:prediction} studies OK and UK with indefinite covariance matrices and develops subspace decompositions that distinguish prediction-relevant from prediction-irrelevant directions. Section~\ref{sec:diagnostics} presents spectral diagnostics and subspace-constrained adjustment schemes for assessing and controlling indefiniteness. Section~\ref{sec:implementation} describes the computational framework used throughout the paper, including covariance construction, perturbation mechanisms, spectral analysis, covariance correction procedures, and kriging evaluation. Section~\ref{sec:numerical} reports numerical experiments on synthetic spatial data designed to investigate the effects of increasing levels of indefiniteness on prediction accuracy and uncertainty quantification. Section~\ref{sec:real-data} applies the proposed methodology to stream-sediment geochemical data from the Kimberley region of Western Australia and evaluates its behaviour under realistic spatial sampling configurations. Finally, Section~\ref{sec:discussion} discusses the implications of the results for geostatistical modelling and spatial prediction and outlines directions for future research.
+		
+% ----------------------------------------------------------------------
+\section{Related Work and Positioning}
+\label{sec:literature}
+% ----------------------------------------------------------------------
+
+The idea that certain forms of indefiniteness can be tolerated in kernel based methods has appeared in other research communities. We briefly review existing approaches and explain how the present work differs in motivation and scope.
+
+\subsection{Indefinite Kernels in Machine Learning}
+
+In machine learning, indefinite kernels arise when similarity functions that are not PSD are used in kernel methods such as support vector machines. Early work recognised that many natural similarity measures produce indefinite Gram matrices \citep{haasdonk2005feature,haasdonk2005learning}. Three main approaches have been developed. One line of work constructs PSD approximations via eigenvalue clipping or spectral transformations \citep{Chen2009,Alabdulmohsin2014}. A second line formulates learning problems as non-convex optimisation with indefinite kernels \citep{Luss2009}. A third line re interprets kernel methods in reproducing kernel Krein spaces \citep{Schwartz1964}.
+
+The machine learning literature focuses mainly on classification and regression on fixed training and test sets. Methods such as Krein SVM reformulate the optimisation problem so that it remains well defined with indefinite kernels \citep{haasdonk2005feature,haasdonk2005learning}. They do not however analyse which directions of indefiniteness affect predictions and which directions can be neglected. The subspace decompositions in Sect.~\ref{sec:prediction} and the alignment diagnostics in Sect.~\ref{sec:diagnostics}   are specific to spatial prediction and use the geometry of kriging systems. There is no direct analogue of this prediction subspace view in the indefinite kernel machine learning literature.
+
+\subsection{Reproducing Kernel Krein Spaces}
+
+The theory of reproducing kernel Krein spaces provides rigorous foundations for indefinite kernels on continuous domains \citep{Schwartz1964,Alpay1997}. A result due to \citet{Schwartz1964} characterises indefinite kernels as differences of positive definite functions and gives a correspondence similar to the one between positive definite kernels and Hilbert spaces \citep[see also][]{Alpay1997}. This theory emphasises function space properties and abstract kernel decompositions.
+
+In contrast, the  framework presented here is finite dimensional and task oriented. We work with symmetric matrices on fixed sampling designs and with the linear systems that define OK and UK. Our focus is on prediction subspaces spanned by trend constraints and covariance vectors. We ask when an indefinite matrix is safe to use for kriging on a given design. The relation between such finite dimensional kriging safe structures and admissible covariance functions in Krein space remains an interesting theoretical question, but it is not the main focus here.
+
+\subsection{Nearest Positive Semi Definite Matrix Approximation}
+
+When a symmetric matrix is not PSD, a standard remedy is to compute its nearest PSD approximation in a chosen norm. \citet{Higham1988} showed that the nearest PSD matrix in the Frobenius norm is obtained by eigenvalue decomposition followed by clipping of  negative eigenvalues to zero. Extensions to other norms and constraints have been developed in numerical linear algebra \citep{ChengHigham1998,Higham2002}.
+
+In geostatistics, empirical covariance matrices estimated from finite and noisy data often exhibit small negative eigenvalues due to sampling variability or numerical error, and it is common practice to project them onto the cone of PSD matrices, for example by eigenvalue clipping or related nearest-PSD adjustments \citep[e.g.][]{Higham1988,chilesdelfiner2012}. This often removes indefiniteness but may distort covariance structure in ways that degrade spatial prediction, as our numerical examples in Sect(s).~\ref{sec:numerical} and \ref{sec:real-data} illustrate. The subspace-constrained adjustment introduced in Sect.~\ref{sec:diagnostics} is different. It restricts correction to the prediction subspace $U$. Eigenvalue clipping is applied only to the restricted matrix $\mathbf{C}_U = \mathbf{B}_U^{\top} \mathbf{C} \mathbf{B}_U$ and the behaviour in $U^{\perp}$ is left unchanged. This preserves local structure that can be meaningful for prediction while enforcing positive semi definiteness where kriging stability requires it.
+
+\subsection{Positioning within Geostatistics and Mathematical Geosciences}
+
+From the point of view of applied geostatistics, our contribution is complementary to work on variogram modelling, regionalisation, and numerical conditioning in kriging. Many practical workflows combine variograms fitted in different domains, boundary corrections along faults and contacts, and empirical covariances estimated on irregular designs \citep[e.g.][]{chilesdelfiner2012,isaaks1989,goovaerts1997}. These steps produce covariance matrices that are only approximately PSD and that are often corrected by ad hoc smoothing or global eigenvalue clipping. Related ideas also appear in multiscale and patch based geostatistical models for reservoir characterisation and history matching, where block structures and local parameterisations induce non-trivial covariance patterns that do not come from a single global covariance function.
+
+The present framework offers a complementary view. It suggests that full PSD on the entire design space is not always necessary for stable kriging. What matters is the behaviour of the matrix on a low dimensional prediction subspace $U$. By formalising kriging safe matrices and by providing diagnostics in terms of spectral alignment and a safety index, we supply ex ante criteria for deciding when a patchwise or boundary adjusted covariance structure is safe for kriging and when minimal correction is needed.
+
+Unlike global nearest PSD methods, which change the matrix in all directions in order to enforce PSD \citep{Higham1988,ChengHigham1998,Higham2002}, our subspace-constrained approach adjusts only prediction relevant directions. This helps preserve local features introduced deliberately by practitioners, such as domain specific sills and ranges or weakened covariances across contacts. It also provides a concrete alternative to nearest PSD projection when working with empirical or assembled covariance matrices in routine geostatistical practice.
+
+From a methodological perspective, the present contribution combines three elements that, to our knowledge, have not previously been developed together in geostatistics. First, we formalise a hierarchy of admissibility notions centred on prediction subspaces and introduce the task-dependent concept of a kriging-safe covariance matrix. Second, we derive an explicit variance decomposition theorem (Theorem~\ref{thm:variance-decomp}) that isolates the contribution of the prediction subspace and quantifies how negative curvature on its orthogonal complement enters kriging. Third, we propose subspace‑constrained PSD corrections targeted specifically at prediction-relevant directions. Taken together, these results provide a prediction‑oriented alternative to globally PSD covariance modelling and nearest‑projection corrections in routine geostatistical workflows.
+
+% ----------------------------------------------------------------------
+\section{Operational Admissibility of Covariance Structures}
+\label{sec:admissibility}
+% ----------------------------------------------------------------------
+
+\subsection{Covariance Matrices on Fixed Designs}
+
+Let $D \subset \R^d$ be a spatial domain and let
+\[
+s = (s_1,\dots,s_n) \in D^n
+\]
+denote a fixed sampling design. We consider real valued random fields $Z = \{Z(s) : s \in D\}$ with finite second moments and write
+\[
+Z_s = (Z(s_1),\dots,Z(s_n))^{\T} \in \R^n
+\]
+for the vector of field values at the sampling locations. The covariance matrix of $Z_s$ is
+\[
+C = \Cov(Z_s) \in \R^{n \times n},
+\]
+which is symmetric and PSD whenever $Z$ is second order admissible.
+
+In this paper we take a different starting point. We regard $C$ as a symmetric matrix that may or may not be PSD and ask when such a matrix can serve as an effective covariance structure for prediction and uncertainty quantification on the design $s$. To simplify notation we write $C$ for a generic symmetric matrix and reserve the term covariance matrix for cases where $C$ arises as the covariance of some random vector $Z_s$.
+
+\subsection{Admissibility Notions}
+
+Classical theory requires that the covariance function $C(h)$ be positive definite in the sense of Bochner \citep{Bochner2005}. This means that for every finite set of locations $(t_1,\dots,t_m)$ the matrix 
+\[
+K_{t} = \bigl(C(t_i - t_j)\bigr)_{1 \leq i,j \leq m}
+\]
+is PSD. This notion of global positive semi definiteness ensures that the random field is second order admissible on any finite design \citep[cf.][]{Bochner2005,yaglom1987}.
+ 
+Many applied problems involve a single fixed design rather than arbitrary subsets of $D$.
+
+\begin{definition}[Global positive semi definiteness]
+	A symmetric function 
+		\[
+		K : D \times D \to \R
+		\]
+	 is globally PSD if, for every finite set of locations $(t_1,\dots,t_m) \in D^m$, the matrix
+	\[
+	K_{t} = \bigl(K(t_i,t_j)\bigr)_{1 \leq i,j \leq m}
+	\]
+	is PSD.
+\end{definition}
+
+\begin{definition}[Design positive semi definiteness]
+	Let $s \in D^n$ be a fixed sampling design. A symmetric matrix
+	 $C \in \R^{n \times n}$ is design PSD if $C$ is PSD.
+\end{definition}
+
+Design PSD is weaker than global admissibility but still imposes a strong requirement. The matrix must be PSD in all directions of $\R^n$. In many situations only a small set of directions is directly relevant for the prediction problem of interest. We now formalise this idea.
+
+\subsection{Prediction Functionals and Constraint Subspaces}
+
+Consider linear predictors of the form
+\[
+\hat{Z}(s_0) = \lambda^{\T} Z_s,
+\]
+where $s_0 \in D$ is a prediction location and $\lambda \in \R^n$ is a weight vector. In OK with unknown constant mean, the weights satisfy the unbiasedness constraint
+\[
+\lambda^{\T} \mathbf{1}_n = 1,
+\]
+where $\mathbf{1}_n$ is the $n$ vector of ones. In UK the constraint space is larger and involves values of trend functions at the sampling locations.
+
+Let $X \in \R^{n \times p}$ be a constraint matrix whose columns collect the values of the chosen trend or mean functions at the sampling locations. Define
+\[
+H = \mathrm{span}\{\text{columns of } X\} \subset \R^n.
+\]
+For OK we have $X = \mathbf{1}_n$ and $H = \mathrm{span}\{\mathbf{1}_n\}$. For UK, $X$ collects the values of basis functions $(f_1,\dots,f_p)$ and $H = \mathrm{span}\{X\}$.
+
+Prediction locations contribute additional structure. For each $s_0$, the covariance vector between $Z(s_0)$ and $Z_s$ is
+\[
+c_0 = \bigl(\Cov(Z(s_i),Z(s_0))\bigr)_{1 \leq i \leq n} \in \R^n.
+\]
+In practice these vectors are obtained from a parametric covariance model or estimated empirically. We assume that for each prediction location of interest such a vector $c_0$ has been specified.
+
+\begin{definition}[Prediction subspace]
+	Let $S_0$ be a finite set of prediction locations. The prediction subspace associated with design $s$, constraint matrix $X$, and prediction set $S_0$ is
+	\[
+	U = \mathrm{span}\bigl( \mathrm{col}(X) \cup \{ c_0(s_0) : s_0 \in S_0 \} \bigr) \subset \R^n,
+	\]
+	where $c_0(s_0)$ denotes the covariance vector associated with $s_0$ and $\mathrm{col}(X)$ is the set of columns of $X$.
+\end{definition}
+
+The subspace $U$ collects all directions that enter explicitly into the kriging systems for the prediction locations in $S_0$. These directions are determined by the constraint structure and the covariance vectors between observations and prediction locations. Section~\ref{sec:admissibility} will show that the behaviour of $C$ on $U$ and its interaction with $U^{\perp}$ determine kriging weights and prediction variances.
+
+\subsection{Kriging Safe Covariance Matrices}
+\label{subsec:kriging-safe-matrix}
+We now introduce a notion of admissibility tailored to a fixed prediction problem. It concerns only the solvability of the kriging systems and the sign of the associated prediction variances.
+
+\begin{definition}[Kriging safe covariance matrix]
+	\label{def:kriging-safe}
+	Let $s \in D^n$ be a sampling design, $X \in \R^{n \times p}$ a constraint matrix, and $S_0$ a finite set of prediction locations with associated covariance vectors $c_0(s_0) \in \R^n$. A symmetric matrix $C \in \R^{n \times n}$ is kriging safe with respect to $(s,X,S_0)$ if the following conditions hold.
+	\begin{enumerate}
+		\item For each $s_0 \in S_0$, the OK or UK system associated with the tuple $(C,X,c_0(s_0))$ has a unique solution.
+		\item The resulting prediction variance at each $s_0 \in S_0$ is non-negative.
+	\end{enumerate}
+\end{definition}
+
+This definition captures the operational perspective of the paper. For a fixed design, constraints, and prediction set, we require only that the specific linear systems and quadratic forms that define kriging be well behaved and produce non-negative variances. A kriging safe matrix need not be PSD globally or even on the full design space. The next section develops algebraic conditions and variance decompositions that clarify when a given symmetric matrix is kriging safe for a specified prediction problem.
+	
+\begin{remark}[Operational, not probabilistic]
+	\label{rem:kriging-safe-operational}
+	The notion of a kriging-safe covariance matrix is deliberately operational 	rather than probabilistic. When $C$ is not PSD on the design, it need not arise as the covariance of any random field on $D$, and we do not claim otherwise. Instead, kriging safety formalises a weaker, task-dependent requirement in which, for a given $(s,X,S_0)$ the finite-dimensional linear systems and quadratic forms defining OK or UK are well posed and yield non-negative prediction variances. In particular, a matrix can be kriging safe for one prediction problem and not for another, which reflects the fact that admissibility is assessed relative to the specific prediction and estimation tasks at hand rather than via global random-field existence.
+\end{remark}	
+ 	
+% ----------------------------------------------------------------------
+\section{Linear Prediction with Indefinite Covariance}
+\label{sec:prediction}
+% ----------------------------------------------------------------------
+
+\subsection{Kriging Systems with Symmetric Matrices}
+
+We begin with OK on a fixed design.
+Let $C \in \R^{n \times n}$ be a symmetric matrix and suppose that, for a prediction location $s_0$, a covariance vector $c_0 \in \R^n$ has been specified. 
+The OK system is
+\begin{equation}
+	\label{eq:ok-system}
+	\begin{pmatrix}
+		C & \1_n \\
+		\1_n^{\T} & 0
+	\end{pmatrix}
+	\begin{pmatrix}
+		\lambda \\
+		\mu
+	\end{pmatrix}
+	=
+	\begin{pmatrix}
+		c_0 \\
+		1
+	\end{pmatrix},
+\end{equation}
+where $\lambda \in \R^n$ are the kriging weights and $\mu \in \R$ is a Lagrange multiplier enforcing the unbiasedness constraint. 
+
+When $C$ is PSD and $\1_n$ is not in the null space of $C$, the system \eqref{eq:ok-system} has a unique solution. 
+We are interested in the case where $C$ may have negative eigenvalues.
+The first question is when the system matrix
+\[
+K =
+\begin{pmatrix}
+	C & \1_n \\
+	\1_n^{\T} & 0
+\end{pmatrix}
+\]
+is non-singular. The results in this section provide sufficient, but not necessary, conditions for kriging systems to remain well-defined when \(C\) is indefinite.
+
+\begin{lemma}[Nonsingularity of the kriging matrix]
+	\label{lem:K-nonsingular}
+	Let $C \in \R^{n \times n}$ be symmetric.
+	If $C$ is non-singular and $\1_n^{\T} C^{-1} \1_n \neq 0$, then the kriging matrix $K$ in \eqref{eq:ok-system} is nonsingular.
+\end{lemma}
+
+\begin{proof}
+	Assume that $C$ is non-singular.
+	We compute the Schur complement of $C$ in $K$:
+	\[
+	S = 0 - \1_n^{\T} C^{-1} \1_n = - \1_n^{\T} C^{-1} \1_n.
+	\]
+	If 
+	\[
+	\1_n^{\T} C^{-1} \1_n \neq 0,
+	\] 
+   then $S \neq 0$ and hence the Schur complement is non-singular.
+   
+	Since $C$ is non-singular and $S$ is non-singular, the block matrix $K$ is non-singular.
+\end{proof}
+
+Lemma~\ref{lem:K-nonsingular} imposes no sign condition on $C$.
+In particular, $C$ may be indefinite as long as it is invertible and the scalar $\1_n^{\T} C^{-1} \1_n$ is non-zero.
+
+Similar conditions can be derived for UK by replacing $\1_n$ with a full-rank constraint matrix $X$.
+
+\begin{remark}
+	When $C$ is PSD, invertibility of $C$ fails precisely when $C$ has a zero eigenvalue.
+	In this case, the OK system can still be solvable provided the constraint vector $\1_n$ lies outside the null space of $C$.
+	The indefinite case is analogous, since what matters is the relative position of $\1_n$ with respect to the null and negative-definite subspaces of $C$.
+\end{remark}
+
+\subsection{Prediction Variance with Indefinite Covariance}
+
+For a symmetric matrix $C$ and covariance vector $c_0$, the usual expression for the OK prediction variance is
+\begin{equation}
+	\label{eq:ok-variance}
+	\sigma^2(s_0) = C(0) - 2 \lambda^{\T} c_0 + \lambda^{\T} C \lambda,
+\end{equation}
+where $C(0)$ denotes the marginal variance at $s_0$ and $(\lambda,\mu)$ solve \eqref{eq:ok-system}. 
+
+When $C$ is a covariance matrix derived from a random field, $\sigma^2(s_0)$ is guaranteed to be non-negative. 
+
+If $C$ is indefinite, \eqref{eq:ok-variance} may or may not be non-negative.
+
+We now express $\sigma^2(s_0)$ in a way that separates the contributions of prediction-relevant and irrelevant directions. 
+
+Let $U$ be the prediction subspace associated with the OK constraint $\1_n$ and the covariance vector $c_0$.
+In this simple setting,
+\[
+U = \mathrm{span}\{\1_n, c_0\} \subset \R^n.
+\]
+
+For OK, this is exactly the specialisation of the general definition  
+\[
+U = \mathrm{span}(\mathrm{col}(X) \cup \{c_0(s_0)\})
+\]
+ with $X = \mathbf{1}_n$.
+
+Let $P_U$ and $P_{U^{\perp}}$ denote the orthogonal projections onto $U$ and its orthogonal complement.
+We write
+\[
+\lambda = \lambda_U + \lambda_{U^{\perp}},
+\]
+where $\lambda_U = P_U \lambda$ and $\lambda_{U^{\perp}} = P_{U^{\perp}} \lambda$.
+ 
+\begin{theorem}[Variance decomposition over the prediction subspace]
+	\label{thm:variance-decomp}
+	Let $C \in \mathbb{R}^{n\times n}$ be symmetric and suppose the OK system~\eqref{eq:ok-system} with covariance vector $c_0 \in \mathbb{R}^n$ admits a solution $(\lambda,\mu)$. Let
+	\[
+	U = \operatorname{span}\{ \mathbf{1}_n, c_0 \} \subset \mathbb{R}^n
+	\]
+	be the associated prediction subspace and write
+	$\lambda = \lambda_U + \lambda_{U^\perp}$ for the orthogonal decomposition with respect to the standard Euclidean inner product and the subspace $U$. Then the OK variance
+	\begin{equation}
+		\label{eq:variance-decomp}
+		\sigma^2(s_0) = C_0 - \lambda_U^\top c_0 - \mu
+	\end{equation}
+	depends on the kriging weights only through their projection
+	$\lambda_U$ onto $U$.
+\end{theorem}
+   
+\begin{proof}[Proof sketch]
+	We present here only the main ideas. The complete proof is given in
+	\ref{app:variance-decomp-proof}.
+	
+	The OK system can be written in matrix form as
+	\[
+	C \lambda + \mu \mathbf{1}_n = c_0,
+	\]
+	so that
+	\[
+	C\lambda - c_0 = -\mu \mathbf{1}_n \in \operatorname{span}\{\mathbf{1}_n\} \subset U.
+	\]
+In particular, $C\lambda \in U$. Since $c_0 \in U$ by definition of $U$ and
+$\lambda_{U^\perp}\perp U$, we obtain
+\[
+\lambda^\top c_0
+=
+(\lambda_U+\lambda_{U^\perp})^\top c_0
+=
+\lambda_U^\top c_0.
+\]	
+	The usual expression for the OK variance is
+	\(\sigma^2(s_0) = C_0 - \lambda^\top c_0 - \mu\). Combining this with the fact that
+	$\lambda^\top c_0 = \lambda_U^\top c_0$ yields
+	\[
+	\sigma^2(s_0) = C_0 - \lambda_U^\top c_0 - \mu,
+	\]
+	which is exactly \eqref{eq:variance-decomp}. 
+	
+\end{proof}
+\begin{remark}
+	\label{rem:lambdaClambda-U}
+	Writing $\lambda = \lambda_U + \lambda_{U^\perp}$ with respect to the prediction subspace $U$ and its orthogonal complement, the kriging normal equations imply $C\lambda \in U$ and hence
+	\[
+	\lambda_{U^\perp}^\top C\lambda = 0.
+	\]
+	A short algebraic manipulation then yields
+	\[
+	\lambda^\top C\lambda
+	= \lambda_U^\top C\lambda_U - \lambda_{U^\perp}^\top C\lambda_{U^\perp},
+	\]
+	which is geometrically useful for understanding how negative curvature of $C$ on $U^\perp$ contributes to quadratic forms, although it is not needed for the derivation of \eqref{eq:variance-decomp}.
+\end{remark} 
+
+\begin{remark}
+	The identity \eqref{eq:variance-decomp} shows that the kriging variance can be written in a form that involves only the projection $\lambda_U$ of the kriging weights onto the prediction subspace $U$ and the vectors $c_0$ and $\mathbf{1}_n$ that generate $U$. In particular, although the full solution $\lambda$ depends on the behaviour of $C$ on both $U$ and $U^\perp$, the variance itself depends only on the component $\lambda_U$ lying in $U$.
+\end{remark}
+\begin{remark}
+	\label{rem:variance-decomp-algebraic}  
+	The identity \eqref{eq:variance-decomp} is purely algebraic and holds for any symmetric matrix $C$ for which the OK system admits a solution $(\lambda,\mu)$. No positive semi-definiteness assumption on $C$ is needed for the derivation of \eqref{eq:variance-decomp}.
+\end{remark}
+
+Theorem~\ref{thm:variance-decomp} shows that, at the level of the variance, the kriging weights enter only through their projection $\lambda_U$ onto the prediction subspace $U$. Indefinite behaviour on $U^{\perp}$ can still influence $\lambda_U$ through the kriging equations, but it does not appear as a separate quadratic term in the variance.
+
+In practice, the influence of directions orthogonal to the prediction subspace is therefore mediated through their effect on $\lambda_U$.
+
+\begin{corollary}[Classical non-negativity benchmark]
+	\label{cor:variance-nonneg}
+	In the setting of Theorem~\ref{thm:variance-decomp}, suppose that $C$ is positive semidefinite and that $c_0$ and the kriging system derive from a second order random field with covariance $C$. Then the OK prediction variance $\sigma^2(s_0)$ is non-negative.
+\end{corollary}
+
+\begin{proof}
+	By Theorem~\ref{thm:variance-decomp} we have
+	\[
+	\sigma^2(s_0) = C_0 - \lambda_U^\top c_0 - \mu.
+	\]
+	When $C$ is a covariance matrix and $c_0$ is the corresponding cross-covariance vector, this expression coincides with the conditional variance of $Z(s_0)$ given $Z_s$ under the underlying random field model and is therefore non-negative. Hence $\sigma^2(s_0) \ge 0$.
+\end{proof}
+
+\begin{remark}
+	In the indefinite case, non-negativity of the prediction variance is no longer guaranteed by global positive semi definiteness. The notion of a kriging safe matrix therefore incorporates non-negativity of $\sigma^2(s_0)$ as an explicit requirement for the particular prediction problem $(s,X,S_0)$ under consideration. The variance decomposition in Theorem~\ref{thm:variance-decomp} then serves as a diagnostic tool, because it identifies how negative curvature of $\mathbf{C}$ on $U^\perp$ can enter the variance and helps to construct matrices or adjustments for which the kriging safe conditions are satisfied.
+\end{remark}
+
+This corollary recovers the classical result that PSD covariance matrices guarantee non-negative kriging variances. In the indefinite case, this guarantee no longer holds and non-negativity must be enforced through the kriging safe conditions together with the variance decomposition in Theorem~\ref{thm:variance-decomp}.
+
+The conditions of Corollary~\ref{cor:variance-nonneg} can in principle be satisfied even when $C$ has negative eigenvalues, provided that the associated eigenvectors lie mostly in $U^{\perp}$ and the kriging solution has negligible projection onto those directions. This motivates the diagnostics developed in Sect.~\ref{sec:diagnostics}, which quantify how strongly negative curvature aligns with the prediction subspace.
+
+\subsection{Extension to Universal Kriging}
+\label{subsec:universal-kriging}
+ 
+Universal kriging replaces the implicit constant mean in OK by a parametric trend model with design matrix $X \in \mathbb{R}^{n \times p}$, whose columns collect the values of the chosen trend functions at the sampling locations. The OK constraint $\1_n^\top \lambda = 1$ is then replaced by the unbiasedness constraints $X^\top \lambda = x_0$, where $x_0$ denotes the vector of trend functions evaluated at $s_0$.
+
+In this setting, the role of the prediction subspace $U$ from Theorem~\ref{thm:variance-decomp} is played by the universal-kriging prediction subspace
+\[
+U_{\mathrm{UK}} = \operatorname{span}(\text{columns of } X,\; c_0),
+\]
+with orthogonal complement $U_{\mathrm{UK}}^\perp$. The kriging weights then admit an orthogonal decomposition
+\[
+\lambda = \lambda_{U_{\mathrm{UK}}} + \lambda_{U_{\mathrm{UK}}^\perp}
+\]
+with respect to the standard Euclidean inner product.
+
+An argument analogous to that of Theorem~\ref{thm:variance-decomp} shows that, in UK, the prediction variance depends on the kriging weights only through their projection onto the prediction subspace
+\[
+U_{\mathrm{UK}}
+=
+\operatorname{span}(\text{columns of }X,\;c_0),
+\]
+together with the associated Lagrange multipliers.
+
+We omit the explicit derivation, since it follows the same algebraic steps as those given in \ref{app:variance-decomp-proof} after replacing the OK constraint vector $\mathbf{1}_n$ by the
+columns of $X$.
+
+\subsection{Subspace Decompositions and Operational Equivalence}
+
+The analysis above suggests a natural equivalence relation on symmetric matrices.
+
+\begin{definition}[Operational equivalence]
+	Let $U \subset \R^n$ be a prediction subspace and let $C,\tilde{C} \in \R^{n \times n}$ be symmetric matrices.
+	We say that $C$ and $\tilde{C}$ are operationally equivalent with respect to $U$ if
+	\[
+	x^{\T} C y = x^{\T} \tilde{C} y
+	\quad
+	\text{for all } x,y \in U.
+	\]
+\end{definition}
+
+Operationally equivalent matrices induce the same Gram matrix on $U$ and hence the same values for any quadratic or bilinear forms restricted to $U$. In particular, when $U$ contains the constraint and covariance vectors associated with a kriging problem, operational equivalence preserves the prediction-relevant component of the kriging system. Additional conditions, such as equality of the projections of the kriging weights onto $U$ and agreement of the residual quadratic terms, are required to guarantee complete equality of kriging weights and prediction variances.
+
+\begin{remark}
+	Suppose that two symmetric matrices $C$ and $\tilde C$ are operationally equivalent on a prediction subspace $U$ and produce kriging solutions whose projections onto $U$ coincide, that is, $\lambda_U = \tilde\lambda_U$ for the corresponding weight vectors. Then any difference in prediction variance can only arise through the residual terms
+	\[
+	\lambda_{U^\perp}^{\top} C \lambda_{U^\perp}
+	\quad\text{and}\quad
+	\tilde\lambda_{U^\perp}^{\top} \tilde C\, \tilde\lambda_{U^\perp}.
+	\]
+	Consequently, when these residual contributions are equal, the resulting prediction variances coincide. In particular, changes to $C$ that leave its restriction to $U$ unchanged and do not alter the value of $\lambda_{U^\perp}^{\top} C \lambda_{U^\perp}$ for the kriging solution will not affect kriging variances for the given prediction problem.
+\end{remark}
+	
+% ----------------------------------------------------------------------
+\section{Diagnostics and Minimal Adjustment Schemes}
+\label{sec:diagnostics}
+% ----------------------------------------------------------------------
+
+\subsection{Spectral Diagnostics for Kriging Safety}
+
+Let $C \in \R^{n \times n}$ be a symmetric, possibly indefinite, matrix associated with a sampling design $s$.
+We outline diagnostics that assess whether $C$ is kriging-safe with respect to a given prediction subspace $U$.
+
+\paragraph{Spectral decomposition.}
+Compute the eigenvalue decomposition
+\[
+C = Q \Lambda Q^{\T},
+\]
+where $Q$ is orthogonal and $\Lambda = \diag(\lambda_1,\dots,\lambda_n)$ collects the eigenvalues in non-increasing order.
+Negative eigenvalues indicate directions in which $C$ fails to be PSD.
+
+\paragraph{Alignment with the prediction subspace.}
+Let $P_U$ be the orthogonal projector onto $U$.
+For each eigenvector $q_i$ corresponding to a negative eigenvalue $\lambda_i < 0$, compute
+\[
+\alpha_i = \| P_U q_i \|.
+\]
+If $\alpha_i$ is small, then the corresponding negative direction lies largely in $U^{\perp}$ and has little influence on kriging weights or prediction variances.
+Large values of $\alpha_i$ indicate potential instability.
+
+\paragraph{Kriging-variance check.}
+For each prediction location $s_0 \in S_0$, solve the kriging system with matrix $C$ and compute the corresponding prediction variance.
+If all variances are non-negative (within numerical tolerance) and the resulting weights are stable under small perturbations of $C$, then $C$ can be deemed kriging-safe in practice.
+
+\begin{definition}[Kriging-safety index] 
+	Let $C$ be symmetric with eigenvalue decomposition $C = Q \Lambda Q^{\T}$ and let $U$ be a prediction subspace.
+	Define
+	\[
+	\kappa(C,U)
+	=
+	\max_{\lambda_i < 0} \bigl( -\lambda_i \, \alpha_i^2 \bigr),
+	\]
+	where $\alpha_i = \| P_U q_i \|$.
+	
+	We call $\kappa(C,U)$ the kriging-safety index of $C$ with respect to $U$.
+\end{definition}
+
+The quantity $\kappa(C,U)$ measures the worst-case negative curvature of $C$ in directions that overlap with the prediction subspace. Small values indicate that indefiniteness is confined to directions nearly orthogonal to $U$,
+whereas large values suggest that negative curvature may affect prediction. In the numerical sections we propose simple regimes for ``small'' and ``large'' values of $\kappa(C,U)$; these thresholds are heuristic and chosen
+to separate behaviours observed in our experiments, and are not intended as universal constants or as sharp theoretical bounds. The diagnostics and the associated $\kappa(C,U)$  are therefore intended as practical sufficient checks for kriging safety in applied settings, rather than as a complete characterisation of all indefinite covariance structures that might arise.
+
+\subsection{Subspace-Constrained Adjustments}
+
+When diagnostics indicate that $C$ is not kriging-safe, a natural response is to adjust $C$ to a nearby matrix $\tilde{C}$ that is PSD, at least on $U$.
+We now sketch two minimal adjustment schemes.
+
+\paragraph{Restriction-projection correction.}
+Let $U$ be the prediction subspace with an orthonormal basis $B_U \in \R^{n \times r}$.
+Consider the restricted matrix
+\[
+C_U = B_U^{\T} C B_U \in \R^{r \times r},
+\]
+and compute its eigenvalue decomposition $C_U = V \Lambda_U V^{\T}$.
+Define a PSD approximation by replacing negative eigenvalues with zero:
+\[
+\tilde{\Lambda}_U = \diag(\max\{\lambda_{U,i},0\}).
+\]
+Set
+\[
+\tilde{C}_U = V \tilde{\Lambda}_U V^{\T}
+\quad\text{and}\quad
+\Delta_U = B_U (\tilde{C}_U - C_U) B_U^{\T}.
+\]
+Finally, define
+\[
+\tilde{C} = C + \Delta_U.
+\]
+
+By construction, $\tilde{C}$ and $C$ agree on $U^{\perp}$ and differ only through a correction supported on $U$.
+Moreover, the restriction of $\tilde{C}$ to $U$ is PSD.
+If the negative eigenvalues of $C_U$ are small, then $\Delta_U$ is small in operator norm and $\tilde{C}$ remains close to $C$.
+
+\begin{proposition}[Subspace-constrained PSD correction]
+\label{prop:subspace-psd}
+Let $C$ be symmetric and let $\tilde{C}$ be constructed as above.
+Then $\tilde{C}$ is symmetric and its restriction to $U$ is PSD.
+\end{proposition}	
+
+\begin{proof}
+Symmetry of $\tilde{C}$ is immediate from construction.
+The restriction of $\tilde{C}$ to $U$ is given by $\tilde{C}_U$, which is PSD by eigenvalue clipping.
+\end{proof}	
+\paragraph{Local spectral clipping.}
+An alternative would be to apply standard nearest-positive-semidefinite adjustments, such as eigenvalue clipping, but restrict attention to the restriction $C_U$ rather than to the full matrix $C$.
+This avoids altering the behaviour of $C$ in directions entirely unrelated to prediction.
+
+The resulting PSD approximation on $U$ can then be lifted to $\R^n$ by embedding it in the larger space, as above.
+
+\subsection{Relation to Global PSD Projection}
+
+Global projection of an indefinite matrix $C$ onto the cone of PSD matrices minimises a norm such as the Frobenius norm over all PSD matrices \citep{Higham1988,Higham2002} 
+While such nearest-PSD projections yield an admissible covariance matrix, they can substantially alter the structure of $C$ in directions that have a strong physical or geological interpretation but may be irrelevant for a particular prediction problem \citep[cf.][]{chilesdelfiner2012}.
+
+By contrast, the subspace-constrained schemes described here adjust $C$ only along prediction-relevant directions.
+
+From an operational viewpoint, it is sufficient that the restriction of $C$ to $U$ be PSD for kriging to be well-behaved.
+Global positive semi-definiteness may be required if one wishes to interpret $C$ as the covariance of a random vector in all directions.
+However, for many geostatistical workflows, this interpretative step is secondary to the primary tasks of prediction and uncertainty quantification.
+
+	
+			
+% ----------------------------------------------------------------------
+\section{Computational Implementation}
+\label{sec:implementation}
+% ----------------------------------------------------------------------
+
+The computational work consists of a controlled simulation study, designed to examine how progressively increasing covariance indefiniteness affects prediction when the ground truth is known, and a real-data
+application using stream-sediment geochemical measurements from the Kimberley region of Western Australia. In both settings we use the same spectral diagnostics, PSD-adjustment strategies, and kriging performance measures; the main differences lie in the data source and the underlying covariance model.
+
+All numerical experiments were implemented in Python using standard numerical linear algebra routines. The workflow consists of covariance construction, generation of controlled indefiniteness, spectral diagnostics, covariance correction, and OK evaluation, and the same framework is applied to both the synthetic and Kimberley data.
+
+\subsection{Covariance Models and Spatial Configurations}
+
+We consider exponential and spherical covariance functions. Given locations $s_i$ and $s_j$ at separation distance $h$, the exponential model is
+\[
+C(h) = \sigma^2 \exp(-h/\theta),
+\]
+where $\theta$ is a range parameter, and the spherical model is
+\[
+C(h) =
+\begin{cases}
+	\sigma^2
+	\Bigl(
+	1-\frac{3h}{2a}+\frac{h^3}{2a^3}
+	\Bigr),
+	& h \le a,\\[1ex]
+	0,& h>a,
+\end{cases}
+\]
+with practical range $a$.
+
+In the synthetic study, we generate a one-dimensional design with $n=30$ observation locations sampled uniformly on a bounded interval and $m=10$ prediction locations placed regularly over the same domain. A Gaussian random field is simulated from the chosen covariance model via Cholesky factorisation. In the Kimberley case study, the design consists of observed stream-sediment sample locations extracted from the Pickands–Mather data set and treated as two-dimensional Cartesian coordinates. For each stream–element combination, a spherical covariance model with fixed sill, nugget, and range parameters is fitted and used to construct the covariance matrix on the sampled locations; observations with missing coordinates or assay values are discarded.
+
+\subsection{Prediction Subspaces and Structural Perturbations}
+
+For each design we construct the OK prediction subspace
+\[
+U = \mathrm{span}\bigl(\mathbf{1}_n,\{\mathbf{c}_0(s_0)\}_{s_0\in S_0}\bigr),
+\]
+where $\mathbf{1}_n$ is the $n$-vector of ones and $\mathbf{c}_0(s_0)$ is the covariance vector between $Z(s_0)$ and $Z_s$. An orthonormal basis $\mathbf{B}_U$ is obtained by QR factorisation of these vectors and used to separate prediction-relevant and prediction-irrelevant directions.
+
+To mimic typical sources of indefiniteness in geostatistical workflows, we apply three structural perturbations to the baseline covariance matrices. 
+A ``mild boundary'' modification smoothly weakens covariances linking a central region to its periphery, representing boundary effects or gradual departures from stationarity. A ``patchwise'' modification rescales
+covariances within and across two subregions, reflecting domain-specific variograms with reduced cross-domain continuity. A ``local inconsistency'' modification applies stronger, localised changes to selected covariance
+entries while preserving symmetry, producing patterns that are intentionally incompatible with any global PSD model.
+
+Controlled indefiniteness is then introduced by adding low-rank negative components supported mainly in $U^\perp$. Specifically, we construct unit vectors $\mathbf{u}$ approximately orthogonal to $U$ and form rank-one perturbations of the form $-\alpha\,\mathbf{u}\mathbf{u}^\top$.
+
+By varying $\alpha$ and the number of such components we obtain mild, moderate, and severe levels of indefiniteness while keeping the basic geometric structure of the covariance intact.
+
+\subsection{PSD Corrections, Diagnostics, and Kriging Evaluation}
+
+We compare a global PSD correction, based on eigenvalue clipping of the full covariance matrix, with the subspace-constrained correction proposed in Sect.~\ref{sec:diagnostics}. The global correction replaces negative
+eigenvalues of $C$ by a small non-negative threshold, whereas the subspace-based correction clips only the eigenvalues of the restricted matrix $C_U = \mathbf{B}_U^\top C \mathbf{B}_U$ and lifts the resulting PSD approximation back to the full space, leaving $U^\perp$ unchanged.
+
+For each covariance matrix we compute the full eigendecomposition and record the minimum eigenvalue, the number and total mass of negative eigenvalues, the mean and maximum alignment of negative eigenvectors with $U$, and the kriging-safety index $\kappa(C,U)$. These diagnostics quantify both the severity of indefiniteness and its overlap with the prediction subspace.
+
+OK systems are assembled and solved for all prediction locations under three covariance structures, namely the raw indefinite matrix, the globally corrected PSD matrix, and the prediction-subspace PSD matrix. Prediction performance is evaluated via root mean squared error and mean absolute error, and we monitor the number and magnitude of negative kriging variances. In the synthetic study, predictions are compared with reference kriging results under the original PSD covariance model. In the Kimberley case, perturbed-covariance predictions are compared with predictions under the fitted spherical covariance for each stream and element.
+
+Reproducibility is ensured by fixed random seeds in the synthetic experiments; the Kimberley results are deterministic for a given set of covariance parameters.
+		
+% ----------------------------------------------------------------------
+\section{Numerical Experiments}
+\label{sec:numerical}
+% ----------------------------------------------------------------------
+
+We illustrate the framework developed in Sect(s).~\ref{sec:admissibility}-\ref{sec:diagnostics} through numerical experiments on simulated one-dimensional spatial data. The examples examine how different forms and magnitudes of indefiniteness affect OK, and how global and subspace-constrained PSD corrections interact with prediction-relevant and prediction-irrelevant directions.
+
+\subsection{Experimental Design}
+
+We consider a one-dimensional domain $\mathcal{D} = [0,10]$ with $n = 30$ observation locations sampled uniformly at random and $m = 10$ equally spaced prediction locations. A Gaussian random field with mean zero is generated on this design under two covariance families. In the exponential case we take
+\[
+C_{\exp}(h) = \exp(-h/\theta), \qquad \theta = 2.0,
+\]
+and in the spherical case
+\[
+C_{\mathrm{sph}}(h) =
+\begin{cases}
+	1 - 1.5(h/a) + 0.5(h/a)^3, & 0 \le h \le a,\\[4pt]
+	0, & h > a,
+\end{cases}
+\qquad a = 2.0,
+\]
+where $h = |s_i - s_j|$ is separation distance. In each case field values $\mathbf{z} = (Z(s_1),\ldots,Z(s_n))^\top$ are sampled via Cholesky factorisation of the corresponding true covariance matrix $\mathbf{C}_{\mathrm{true}}$, and experiments are run separately for the two covariance families.
+
+To emulate practically motivated deviations from global PSD, we construct three perturbed matrices with increasing inconsistency on the design:
+
+\begin{itemize}
+	\item \emph{Mild (boundary effect)}: smooth downweighting of covariances linking the middle third of locations to the outer thirds, mimicking 	boundary effects.
+	\item \emph{Moderate (patchwise model)}: asymmetric rescaling of within- and 	cross-region covariances for a left/right partition, representing 	separately fitted variograms in neighbouring domains.
+	\item \emph{High (local inconsistency)}: stronger, localised perturbations 	of selected covariance entries together with a larger low-rank negative component, used as an upper-end stress test.
+\end{itemize}
+
+In each scenario the structural perturbation is applied to $\mathbf{C}_{\mathrm{true}}$ (exponential or spherical), and a rank-one negative term $-\alpha \mathbf{u}\mathbf{u}^\top$ is added in a direction $\mathbf{u}$ chosen to lie mostly in the orthogonal complement of the prediction subspace
+\[
+U = \mathrm{span}\bigl(\mathbf{1}_n,\{\mathbf{c}_0(s_0)\}_{s_0}\bigr),
+\]
+where $\mathbf{c}_0(s_0)$ is the covariance vector between observations and prediction location $s_0$. This construction increases indefiniteness from mild to high while keeping many negative directions nearly orthogonal to
+$U$.
+
+For each perturbed matrix $\mathbf{C}_{\mathrm{indef}}$ we compute OK predictions at the $m$ prediction locations using three covariance structures, namely the \emph{raw indefinite} matrix $\mathbf{C}_{\mathrm{indef}}$ itself, a \emph{global PSD} version obtained by standard eigenvalue clipping
+$\mathbf{C}_{\mathrm{PSD}} = \mathbf{Q}\Lambda_+\mathbf{Q}^\top$, and a \emph{subspace PSD} version that enforces PSD only on $U$ as in Proposition~\ref{prop:subspace-psd}. Predictions are benchmarked against kriging under $\mathbf{C}_{\mathrm{true}}$ using RMSE, MAE, and kriging variance diagnostics (number and magnitude of negative prediction variances).
+
+\subsection{Eigenvalue Structure and Subspace Alignment}
+
+Tables~\ref{tab:exp_eigenvalues} and~\ref{tab:sph_eigenvalues} summarise the eigenvalue structure of the three perturbed covariance matrices. Mild and moderate perturbations introduce only a single small negative eigenvalue, with total negative mass below $0.1$ in both covariance families, whereas the high local inconsistency matrices exhibit eight negative eigenvalues with substantially larger minimum and total negative eigenvalues.
+
+\begin{table}[htbp]
+	\centering
+	\caption{Eigenvalue characteristics of perturbed exponential covariance matrices.}
+	\label{tab:exp_eigenvalues}
+	\begin{tabular}{lrrr}
+		\hline
+		Scenario & Min eigenvalue & Negative count & $\sum |\lambda_i^-|$ \\
+		\hline
+		Mild (boundary) & -0.018 & 1 & 0.018 \\
+		Moderate (patchwise) & -0.077 & 1 & 0.077 \\
+		High (local inconsistency) & -0.417 & 8 & 1.630 \\
+		\hline
+	\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+	\centering
+	\caption{Eigenvalue characteristics of perturbed spherical covariance matrices.}
+	\label{tab:sph_eigenvalues}
+	\begin{tabular}{lrrr}
+		\hline
+		Scenario & Min eigenvalue & Negative count & $\sum |\lambda_i^-|$ \\
+		\hline
+		Mild (boundary) & -0.015 & 1 & 0.015 \\
+		Moderate (patchwise) & -0.062 & 1 & 0.062 \\
+		High (local inconsistency) & -0.378 & 8 & 1.316 \\
+		\hline
+	\end{tabular}
+\end{table}
+
+Because the low-rank negative terms are constructed to lie mostly in $U^\perp$, the associated negative eigenvectors have small projections on $U$ in the mild and moderate scenarios, consistent with the prediction subspace viewpoint developed in Sect.~\ref{sec:prediction}.
+
+\subsection{Kriging Performance}
+
+Tables~\ref{tab:exp_performance} and~\ref{tab:sph_performance} report prediction errors and variance diagnostics for all methods and scenarios. 
+
+\begin{table}[htbp]
+	\centering
+	\caption{Kriging performance (exponential covariance): RMSE, MAE, and variance diagnostics.}
+	\label{tab:exp_performance}
+	\begin{tabular}{llrrrr}
+		\hline
+		Scenario & Method & RMSE & MAE & Neg. vars. & Min var. \\
+		\hline
+		Mild     & Raw indefinite   & 0.171 & 0.135 & 3/10 & -0.012 \\
+		& Global PSD       & 0.177 & 0.145 & 3/10 & -0.044 \\
+		& Subspace PSD     & 0.171 & 0.135 & 3/10 & -0.012 \\
+		\hline
+		Moderate & Raw indefinite   & 0.103 & 0.093 & 3/10 & -0.108 \\
+		& Global PSD       & 0.398 & 0.332 & 3/10 & -0.109 \\
+		& Subspace PSD     & 0.103 & 0.093 & 3/10 & -0.108 \\
+		\hline
+		High     & Raw indefinite   & 0.319 & 0.278 & 2/10 & -0.164 \\
+		& Global PSD       & 26.546 & 21.396 & 10/10 & -15.555 \\
+		& Subspace PSD     & 0.319 & 0.278 & 2/10 & -0.164 \\
+		\hline
+	\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+	\centering
+	\caption{Kriging performance (spherical covariance): RMSE, MAE, and variance diagnostics.}
+	\label{tab:sph_performance}
+	\begin{tabular}{llrrrr}
+		\hline
+		Scenario & Method & RMSE & MAE & Neg. vars. & Min var. \\
+		\hline
+		Mild     & Raw indefinite   & 0.082 & 0.035 & 0/10 & 0.015 \\
+		& Global PSD       & 0.075 & 0.060 & 1/10 & -0.017 \\
+		& Subspace PSD     & 0.082 & 0.035 & 0/10 & 0.015 \\
+		\hline
+		Moderate & Raw indefinite   & 0.109 & 0.093 & 1/10 & -0.083 \\
+		& Global PSD       & 0.647 & 0.520 & 2/10 & -0.087 \\
+		& Subspace PSD     & 0.109 & 0.093 & 1/10 & -0.083 \\
+		\hline
+		High     & Raw indefinite   & 0.426 & 0.367 & 0/10 & 0.056 \\
+		& Global PSD       & 33.590 & 27.706 & 10/10 & -22.591 \\
+		& Subspace PSD     & 0.426 & 0.367 & 0/10 & 0.056 \\
+		\hline
+	\end{tabular}
+\end{table}
+
+For both covariance families, the raw indefinite and subspace-corrected methods were operationally equivalent across all scenarios considered, producing identical RMSE, MAE, and kriging variance summaries to numerical precision.
+In the mild regime, overall errors are small and the few negative kriging variances are of negligible magnitude. In the moderate patchwise regime, the perturbed covariance retains useful local structure and prediction performance remains close to the reference, despite the presence of a negative eigenvalue.
+
+By contrast, global PSD projection has little or no benefit in the mild case and becomes clearly detrimental as indefiniteness increases. In the moderate scenario it substantially inflates RMSE and MAE while leaving the pattern of negative variances essentially unchanged. In the high inconsistency scenario it leads to severe instability, with RMSE and MAE increasing by two orders of magnitude and all prediction variances turning negative, even though the adjusted matrix is formally PSD. The subspace correction avoids this failure mode by leaving prediction-relevant directions unchanged and correcting only the restriction of $C$ to $U$.
+
+\subsection{Summary}
+
+Overall, the simulations show that small and moderate departures from PSD can be acceptable for OK when negative curvature lies mostly in $U^\perp$, and that global nearest-PSD projections may degrade or destabilise prediction in such settings. The subspace-constrained correction behaves like the raw indefinite method on the prediction subspace while providing a mechanism to enforce PSD where it matters, supporting the operational notion of kriging-safe covariance matrices developed in Sect.~\ref{sec:admissibility}.
+
+% ----------------------------------------------------------------------
+\section{Application to Real Data: Pickands--Mather Kimberley Geochemistry}
+\label{sec:real-data}
+% ----------------------------------------------------------------------
+
+We illustrate the framework using a public stream-sediment geochemistry dataset from the Kimberley region of Western Australia. The data were collected by Pickands-Mather and Company and are available through the Department of Mines, Industry Regulation and Safety of Western Australia \citep{DMIRS2025}. The survey provides a realistic test case under
+heterogeneous geology, irregular sampling, and multivariate metal concentrations.
+
+\subsection{Dataset, Model, and Prediction Subspaces}
+
+The Pickands-Mather stream-sediment dataset contains locations of stream sampling sites together with multi-element assays. Here we focus on Cu (ppm) and work at the level of individual stream segments indexed by $\mathrm{StmNo}$. For each selected stream we extract Cu assays, discard samples with missing or invalid values, and retain $(X,Y)$
+coordinates for variogram modelling and kriging. Sampling locations follow drainage lines rather than a regular grid, and local sampling density varies across streams, reflecting practical sampling constraints and heterogeneous geology.
+
+Based on preliminary variography for Cu, spherical models with a moderate nugget provided a reasonable compromise between empirical fit and numerical stability. For all Kimberley experiments we therefore adopt a spherical covariance with nugget,
+\[
+C(h)
+=
+\begin{cases}
+	\sigma^2 \bigl[1 - 1.5(h/a) + 0.5(h/a)^3\bigr] + \tau^2, & 0 \le h \le a,\\[4pt]
+	\tau^2, & h > a,
+\end{cases}
+\]
+with fixed $\sigma^2 = 0.9$, $\tau^2 = 0.10$ and $a = 9000~\mathrm{m}$, chosen to be compatible with fitted Cu variograms on Stream~4 and broadly representative for the other streams. The resulting stream-specific covariance matrices $\mathbf{C}_{\mathrm{true}} = \mathbf{C}_{\mathrm{sph}} + \tau^2 \mathbf{I}$ are strictly positive definite and yield well-conditioned OK systems.
+
+We concentrate on four representative streams with identifiers $\mathrm{StmNo} \in \{1,2,3,4\}$. For stream $k$ we obtain an $n_k \times 2$ coordinate matrix and corresponding Cu values, and select $m = 20$ prediction locations as roughly equally spaced sites along the stream (or all sites if $n_k \le 20$). The OK prediction subspace is
+\[
+U
+=
+\mathrm{span}\{\mathbf{1}_{n_k},
+\mathbf{c}_0(s_1^\ast),\ldots,\mathbf{c}_0(s_m^\ast)\}
+\subseteq \mathbb{R}^{n_k},
+\]
+where $\mathbf{c}_0(s_j^\ast)$ denotes the covariance vector under the spherical-nugget model. An orthonormal basis $\mathbf{B}_U$ is obtained by QR factorisation and used to restrict and correct the covariance on $U$. In the main text we use Stream~1 as a representative case study, while results for Streams~2-4 (and other metals) are provided in \ref{app:kimberley-results}.
+
+\subsection{Perturbations and Spectral Diagnostics}
+
+To mirror the synthetic experiments, we construct three perturbed covariance matrices on each stream design, denoted $\mathbf{C}_{\mathrm{mild}}$,
+$\mathbf{C}_{\mathrm{moderate}}$, and $\mathbf{C}_{\mathrm{high}}$. The structural perturbations follow the same boundary-type, patchwise, and local inconsistency patterns as in Sect.~\ref{sec:numerical}, adapted to the stream geometry, and are combined with low-rank negative components supported mainly in $U^\perp$.
+
+The mild scenario weakens covariances linking a central band of the stream to upstream and downstream segments using a smooth reduction in the $X$-direction. The moderate scenario imposes a patchwise structure by splitting each stream into left and right halves and asymmetrically rescaling within- and cross-half covariances. The high scenario adds strong, localised inconsistencies by randomly perturbing covariances for triples of locations, together with a larger negative rank-one component, and is intended as a stress test rather than a realistic model.
+
+For each perturbed matrix we compute spectral diagnostics
+\[
+(\lambda_{\min},\text{negcount},\sum|\lambda_i^-|,\kappa(C,U)),
+\]
+together with mean and maximum alignment of the negative eigenvectors with the prediction subspace $U$. The eigenvalue summary for Stream~1 is reported in Table~\ref{tab:extended_eigen_stream_1_Cu}, and the corresponding spectral diagnostics are visualised in Fig.~\ref{fig:summary_stream1_cu}. Stream-wise summaries for $\mathrm{StmNo}\in\{2,3,4\}$ are provided in  \ref{app:kimberley-results} and exhibit the same qualitative pattern.
+
+\begin{table}[htbp]
+	\centering
+	\caption{Spectral diagnostics for Stream 1 and Cu.}
+	\label{tab:extended_eigen_stream_1_Cu}
+	\begin{tabular}{lrrrrrr}
+		\hline
+		Scenario & Min eigenvalue & Neg. count & $\sum |\lambda_i^-|$ &
+		Mean align. & Max align. & $\kappa(C,U)$ \\
+		\hline
+		Mild (Boundary-type)   & 0.105 &   0 &  0.000 & 0.000 & 0.000 & 0.0000 \\
+		Moderate (Patchwise-type) & 0.081 &   0 &  0.000 & 0.000 & 0.000 & 0.0000 \\
+		High (Local inconsistency) & -0.492 & 385 & 52.002 & 0.007 & 0.018 & 0.0001 \\
+		\hline
+	\end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=1.0\textwidth]{Fig1.eps}
+	\caption{Spectral and prediction diagnostics for Stream~1 and Cu. Rows correspond to mild, moderate, and high perturbations; columns show eigenvalue spectra, kriging variance histograms (raw indefinite vs subspace PSD), and raw vs subspace PSD predictions.}
+	\label{fig:summary_stream1_cu}
+\end{figure}
+
+For all four streams, the mild and moderate perturbations remain strictly PSD, whereas the high scenarios introduce a stream-dependent number of negative eigenvalues with total negative mass between about $12$ and $52$, while maintaining low alignment with $U$ (quantified by small $\kappa(C,U)$). In the Kimberley setting, therefore, indefiniteness arises only under deliberately strong perturbations and is largely confined to prediction-irrelevant directions. Stream~1 is representative of this behaviour and serves as the main case study in the body of the paper; results for Streams~2-4 confirm the same pattern and are relegated to \ref{app:kimberley-results}.
+ 
+\subsection{Kriging Performance on Cu}
+
+For each stream, perturbation scenario, and perturbed covariance matrix
+$\mathbf{C}_{\mathrm{indef}}$, we compare three kriging strategies:
+
+\begin{enumerate}
+	\item Raw indefinite: OK using $\mathbf{C}_{\mathrm{indef}}$ directly.
+	\item Global PSD: OK using the nearest PSD matrix
+	obtained by global eigenvalue clipping of $\mathbf{C}_{\mathrm{indef}}$.
+	\item Subspace PSD: OK using the subspace-adjusted
+	matrix obtained by clipping the eigenvalues of
+	$C_U = \mathbf{B}_U^\top\mathbf{C}_{\mathrm{indef}}\mathbf{B}_U$
+	and lifting the correction back to $\mathbb{R}^{n_k}$.
+\end{enumerate}
+ 
+We form a reference field $\mathbf{z}_{\mathrm{ref}}$ by kriging under the strictly PSD spherical-nugget model $\mathbf{C}_{\mathrm{true}}$ and evaluate RMSE, MAE, the number of negative kriging variances, and the minimum variance at the prediction locations. For Cu on Stream~1, the performance summary in Table~\ref{tab:performance_stream_1_Cu} shows that:
+
+\begin{itemize}
+	\item In the mild and moderate scenarios, all three methods produce numerically  identical results. RMSE and MAE remain small, and no negative kriging variances are observed.
+	
+	\item In the high inconsistency scenario global PSD projection inflates RMSE by a factor of about two to three and can still produce negative kriging variances at many or all prediction locations. In our implementation the globally corrected matrix is PSD as a matrix on the observation design, but the kriging systems continue to use prediction covariance vectors inherited from the original modelling setup, so matrix level PSD alone does not guarantee operational compatibility of 	the resulting kriging tuple.
+\end{itemize}
+
+\begin{table}[htbp]
+	\centering
+	\caption{Kriging performance for Stream 1 and Cu.}
+	\label{tab:performance_stream_1_Cu}
+	\begin{tabular}{llrrrr}
+		\hline
+		Scenario & Method & RMSE & MAE & Neg. vars. & Min var. \\
+		\hline
+		Mild & Raw indefinite & 1.051 & 0.330 & 0/20 &  0.054 \\
+		& Global PSD     & 1.051 & 0.330 & 0/20 &  0.054 \\
+		& Subspace PSD   & 1.051 & 0.330 & 0/20 &  0.054 \\
+		\hline
+		Moderate & Raw indefinite & 1.834 & 1.191 & 0/20 &  0.042 \\
+		& Global PSD     & 1.834 & 1.191 & 0/20 &  0.042 \\
+		& Subspace PSD   & 1.834 & 1.191 & 0/20 &  0.042 \\
+		\hline
+		High & Raw indefinite & 309.262 & 184.774 & 0/20 &   0.074 \\
+		& Global PSD     & 851.722 & 607.572 & 20/20 & -16.320 \\
+		& Subspace PSD   & 309.262 & 184.774 & 0/20 &   0.074 \\
+		\hline
+	\end{tabular}
+\end{table}
+
+Analogous performance tables for Streams~2-4 are reported in \ref{app:kimberley-results} and confirm the same behaviour across the Kimberley streams.
+
+The large RMSE values in the high scenarios reflect the intentionally exaggerated perturbations used as stress tests rather than realistic levels of model misspecification. Crucially, however, only the global PSD projection amplifies these perturbations into systematically negative variances at all prediction locations, while the raw indefinite and subspace-adjusted matrices remain operationally acceptable.
+
+\subsection{Practical Interpretation}
+
+The Kimberley case study complements the one-dimensional simulations in two ways. First, it shows that stream-wise spherical-nugget models fitted to real Cu data can be subjected to mild and moderate structural perturbations without leaving the PSD cone (as illustrated for Stream~1 in the main text and for Streams~2-4 in \ref{app:kimberley-results}), and without compromising kriging performance, so that subspace PSD and global PSD coincide and do not harm prediction. Second, when stronger, localised perturbations push the matrices into a moderately or severely indefinite regime, indefiniteness can still be confined largely to $U^\perp$, in which case raw and
+subspace-adjusted kriging remain stable while global nearest-PSD projection substantially degrades prediction and produces more severe negative variances.
+
+From a workflow perspective, the perturbations considered here are representative of routine steps such as stream-wise variogram fitting, patchwise covariance modelling across catchments, and local boundary adjustments along faults or contacts. The Kimberley analysis illustrates how the proposed diagnostics and subspace corrections can be
+used to assess whether the resulting assembled covariance matrices are kriging-safe and when minimal, prediction-focused adjustment is preferable to blanket global regularisation.
+	
+% ----------------------------------------------------------------------
+\section{Discussion and Conclusions}
+\label{sec:discussion}
+% ----------------------------------------------------------------------
+
+This paper develops a finite-dimensional, task-oriented framework for working systematically with non-PSD covariance structures in geostatistics. The central insight is that global PSD, while mathematically natural, is often stronger than required for linear prediction on a fixed design. By introducing kriging-safe covariance matrices and analysing indefiniteness relative to the prediction subspace $U$ through sufficient conditions and diagnostics, we distinguish departures from admissibility that affect OK or UK from those that are operationally negligible.
+
+The theoretical analysis in Sect(s).~\ref{sec:admissibility}–\ref{sec:diagnostics} yields three main results. OK and UK can remain well defined even when negative curvature exists in $U^\perp$, provided the kriging systems are solvable and prediction-relevant directions satisfy the conditions developed there. Also, negative eigenvalues whose eigenvectors have low alignment with $U$ have negligible effect on kriging weights and prediction variances, as quantified by $\kappa(C,U)$. Finally, subspace-constrained adjustment schemes that clip eigenvalues only on $U$ enforce the conditions needed for kriging stability while leaving prediction-irrelevant directions unchanged.
+
+The numerical experiments reinforce these conclusions in both synthetic and real-data settings. In controlled one-dimensional simulations, boundary-type and patchwise perturbations produced substantial indefiniteness with minimal impact on kriging performance when negative eigenvectors lay mostly in $U^\perp$, whereas global nearest-PSD projection often degraded RMSE and MAE. 
+
+In the Kimberley Cu case study, stream-specific spherical–nugget models with added structural and low-rank negative perturbations yielded mild and moderate scenarios that were fully PSD and high scenarios with moderate indefiniteness largely confined to $U^\perp$; in all four streams, raw and subspace PSD methods produced stable predictors, while global PSD projection substantially inflated errors and created more severe negative kriging variances.
+
+A technical point is worth stressing here. In the experiments the globally corrected matrix is PSD on the observation design, but the prediction covariance vectors and marginal prediction variances used in the kriging tuple are still those implied by the original modelling setup. The numerical examples therefore illustrate that matrix level PSD of the corrected observation covariance does not by itself guarantee that the full kriging tuple behaves as a classical covariance model, and negative prediction variances may still arise when the correction distorts this relationship.
+
+\subsection{Implications and Relation to Regularisation}
+
+The results have several implications for geostatistical workflows. Small to moderate levels of indefiniteness in empirical or patchwise covariance matrices need not be a cause for alarm, provided that spectral diagnostics indicate low alignment of negative eigenvectors with the prediction subspace and safety indices remain within acceptable bounds. In both the synthetic and Kimberley examples, matrices with non-trivial negative spectra still delivered stable kriging performance when used raw or after subspace-based
+adjustment, whereas aggressive global smoothing to enforce PSD often reduced predictive accuracy.
+
+From the perspective of the proposed framework, many existing regularisation methods—such as covariance tapering, ridge-type adjustments, shrinkage covariance estimation, and nugget inflation—can be viewed as global modifications that do not distinguish between prediction-relevant and prediction-irrelevant directions. In terms of $\kappa(C,U)$ and operational equivalence on $U$, such methods can move the matrix further away from the
+original structure on the prediction subspace than is strictly necessary for kriging stability, which helps explain why they may worsen prediction while improving global PSD or conditioning. By contrast, the subspace-constrained adjustments developed here are designed to preserve the restriction of $C$ to $U$ and to modify only those components that are needed to stabilise kriging, making them more targeted than generic global regularisation. The high inconsistency scenarios in Sect(s).~\ref{sec:numerical} and~\ref{sec:real-data} provide concrete instances where global eigenvalue clipping enforces PSD but changes the behaviour of $C$ on $U$ enough to inflate RMSE and produce
+negative variances, even though the raw indefinite and subspace PSD matrices remain kriging-safe.
+
+Conceptually, the results support a more nuanced view of positive semi-definiteness in spatial statistics. Rather than treating global PSD as a rigid prerequisite for all covariance models, we advocate a task-dependent perspective in which admissibility is evaluated relative to the prediction subspace and the specific quadratic forms that appear in kriging systems. In this perspective, many non-PSD structures arising from empirical variograms, boundary effects, patchwise models, or numerical approximations can be used safely for prediction, provided that their negative curvature is mostly orthogonal to $U$ and suitable diagnostics are checked.
+
+\subsection{Limitations and Future Work}
+
+The present work has several limitations that suggest directions for further research. First, the analysis is formulated for linear prediction under second-order structure and does not address non-linear predictors, simulation, or full Bayesian inference with indefinite covariance matrices. Extending the operational admissibility concepts to conditional simulation or hierarchical models would require additional control over joint distributions beyond the prediction subspace. Second, our numerical studies focus on OK with constant mean and on a finite set of prediction locations; universal
+kriging with richer trend spaces and dense prediction grids may lead to larger prediction subspaces and tighter constraints on where indefiniteness can safely reside.
+
+ Section~\ref{subsec:universal-kriging} shows that the geometric and diagnostic framework extends algebraically to UK by replacing $\mathbf{1}_n$ with a general constraint matrix $X$, but systematic numerical studies for richer trend spaces are left for future work.
+
+The real-data results are based on a single commodity and survey. We deliberately chose a setting where the full covariance structure can be examined in detail and where targeted perturbations can mimic boundary, patchwise, and local inconsistency effects; this provides a controlled environment to illustrate the diagnostics and adjustment schemes. Systematic application of the framework to other commodities, additional geochemical
+surveys, and larger regional models is an important step for future work.
+
+The examples considered here involve moderate matrix sizes and relatively simple perturbations. In large-scale applications with millions of locations, both spectral diagnostics and subspace adjustments must be implemented using iterative eigensolvers or low-rank approximations; integrating the proposed framework with scalable linear algebra remains an open problem.
+
+Finally, the Kimberley analysis is not intended as a prevalence study of kriging-safe indefinite structures. It shows that such structures can arise in realistic workflows and are therefore not merely synthetic curiosities; how frequently they occur across different deposits, commodities, sampling designs, and modelling practices is an empirical question that merits separate investigation.
+
+From a practical perspective, users should first examine the covariance spectrum and the alignment of negative eigenvectors with the prediction subspace $U$, for example through $\kappa(C,U)$. If indefiniteness is largely confined to $U^\perp$, the covariance matrix may be acceptable for prediction despite lacking global PSD. When diagnostics indicate
+substantial interaction with $U$, a subspace-constrained correction may be preferable to global PSD projection, reserving full reconstruction for cases where prediction-relevant indefiniteness remains severe.
+
+By aligning admissibility requirements with the geometry of the prediction task, the proposed framework allows geostatistical models to capture complex spatial structure more flexibly while retaining control over prediction and uncertainty quantification. In this sense, PSD is best viewed as one element in a hierarchy of task-dependent conditions rather than as the sole criterion for assessing covariance structures. 
+
+\section*{Declarations}
+
+ 
+
+
+\subsection*{Funding}
+The author received no funding for this work.
+
+\subsection*{Conflict of Interest}
+The author declares no conflict of interest.
+
+\subsection*{Code Availability}
+All code used to implement the proposed methods and reproduce the numerical experiments is available at\\
+\url{https://github.com/fjmaturana/non-positive-definite-geostatistics}.
+
+\subsection*{Data Availability}
+The numerical simulations use synthetic data generated according to the design described in Sect.~\ref{sec:numerical}. 
+
+The Pickands-Mather dataset analysed in Sect.~\ref{sec:real-data} is drawn from the publicly available dataset hosted by the Data and Software Centre (DASC) of the Government of Western Australia (\url{https://dasc.dmirs.wa.gov.au/}). A summary data file is also available as a comma-delimited file at\\ \url{https://github.com/fjmaturana/non-positive-definite-geostatistics}.
+
+
+
+
+\bibliographystyle{plainnat}
+\bibliography{Non-positive}
+
+\appendix
+\renewcommand{\thesection}{Appendix~\Alph{section}}		
+\clearpage
+%\section*{APPENDICES}
+	
+ % ----------------------------------------------------------------------
+\section{Proof of Theorem~\ref{thm:variance-decomp}}
+\label{app:variance-decomp-proof}
+% ----------------------------------------------------------------------
+
+In this appendix we verify the identity~\eqref{eq:variance-decomp} by direct algebraic manipulation of the OK system; the derivation uses only symmetry of $C$ and solvability of~\eqref{eq:ok-system}, and does not require $C$ to be positive semidefinite.
+
+Recall that the OK system can be written as
+\begin{equation}
+	\label{eq:ok-system-appendix}
+	C\lambda + \mu \mathbf{1}_n = c_0, \qquad \mathbf{1}_n^\top \lambda = 1,
+\end{equation}
+where $C \in \mathbb{R}^{n\times n}$ is symmetric, $c_0 \in \mathbb{R}^n$ is the covariance (or cross-covariance) vector, $\lambda \in \mathbb{R}^n$ are the kriging weights, and $\mu \in \mathbb{R}$ is the Lagrange multiplier.
+
+The OK predictor at $s_0$ is
+\[
+\widehat{Z}(s_0) = \lambda^\top Z_s,
+\]
+and the corresponding kriging variance is
+\begin{equation}
+	\label{eq:sigma2-appendix}
+	\sigma^2(s_0) = C_0 - \lambda^\top c_0 - \mu,
+\end{equation}
+where $C_0$ denotes the marginal variance at $s_0$.
+
+Let
+\[
+U = \operatorname{span}\{\mathbf{1}_n,c_0\} \subset \mathbb{R}^n
+\]
+be the prediction subspace associated with OK at $s_0$, and write
+\[
+\lambda = \lambda_U + \lambda_{U^\perp},
+\]
+for the orthogonal decomposition of $\lambda$ with respect to the standard Euclidean inner product and the subspace $U$.
+
+\medskip
+\noindent\textbf{Step 1: The kriging system implies $C\lambda - c_0 \in \operatorname{span}\{\mathbf{1}_n\} \subset U$.}
+
+From the first equation in~\eqref{eq:ok-system-appendix} we have
+\begin{equation}
+	\label{eq:Crhs}
+	C\lambda + \mu \mathbf{1}_n = c_0,
+\end{equation}
+which can be rewritten as
+\[
+C\lambda - c_0 = -\mu \mathbf{1}_n \in \operatorname{span}\{\mathbf{1}_n\}.
+\]
+Since $\mathbf{1}_n \in U$ by definition, it follows that $C\lambda - c_0 \in U$. Because $c_0 \in U$ as well, we conclude that
+\[
+C\lambda \in U.
+\]
+
+\medskip
+\noindent\textbf{Step 2: Express $\lambda^\top c_0$ in terms of $C\lambda$ and $\mu$.}
+
+Taking the inner product of both sides of~\eqref{eq:Crhs} with $\lambda$ and using $\mathbf{1}_n^\top \lambda = 1$ gives
+\[
+\lambda^\top c_0
+= \lambda^\top (C\lambda + \mu \mathbf{1}_n)
+= \lambda^\top C\lambda + \mu.
+\]
+That is,
+\begin{equation}
+	\label{eq:lambda-c0-appendix}
+	\lambda^\top c_0 = \lambda^\top C\lambda + \mu.
+\end{equation}
+
+\medskip
+\noindent\textbf{Step 3: Use that $c_0 \in U$ to relate $\lambda^\top c_0$ and $\lambda_U^\top c_0$.}
+
+By definition of $U$ we have $c_0 \in U$, and by construction
+$\lambda_{U^\perp} \perp U$. Hence
+\[
+\lambda_{U^\perp}^\top c_0 = 0,
+\]
+and therefore
+\begin{equation}
+	\label{eq:lambdaU-c0}
+	\lambda^\top c_0
+	= (\lambda_U + \lambda_{U^\perp})^\top c_0
+	= \lambda_U^\top c_0.
+\end{equation}
+
+\medskip
+\noindent\textbf{Step 4: Derive the variance identity.}
+
+Starting from the variance formula~\eqref{eq:sigma2-appendix} and using
+\eqref{eq:lambdaU-c0} we obtain
+\[
+\sigma^2(s_0)
+= C_0 - \lambda^\top c_0 - \mu
+= C_0 - \lambda_U^\top c_0 - \mu.
+\]
+This is precisely the identity
+\[
+\sigma^2(s_0) = C_0 - \lambda_U^\top c_0 - \mu,
+\]
+stated in Theorem~\ref{thm:variance-decomp}. \qed
+	
+	\clearpage
+% ----------------------------------------------------------------------
+\section{Algorithmic Summary of the Numerical Experiments}
+\label{app:algorithms}
+% ----------------------------------------------------------------------
+
+For completeness, Algorithm~\ref{alg:workflow} 	summarises the computational workflow used in both the synthetic
+experiments and the Kimberley case study.
+
+In the synthetic experiments $\mathbf C_{\mathrm{true}}$ denotes the simulated covariance model on the chosen grid, whereas in the Kimberley case study it denotes the fitted empirical or variogram-based covariance for the corresponding element and domain.
+
+
+\begin{algorithm}[htbp]
+	\caption{Evaluation of indefinite covariance structures}
+	\label{alg:workflow}
+	\begin{algorithmic}[1]
+		\Require Sampling locations $s$, prediction locations $S_0$
+		\Require Baseline covariance matrix $\mathbf C_{\mathrm{true}}$
+		\State Construct prediction subspace $U$
+		\State Compute orthonormal basis $\mathbf B_U$
+		\State Generate perturbed covariance matrices
+		$\mathbf C_{\mathrm{mild}},
+		\mathbf C_{\mathrm{moderate}},
+		\mathbf C_{\mathrm{high}}$
+		\For{each covariance scenario}
+		\State Compute eigenvalue diagnostics
+		\State Compute alignment diagnostics
+		\State Apply global PSD correction
+		\State Apply subspace PSD correction
+		\State Solve OK systems
+		\State Record RMSE, MAE and variance diagnostics
+		\EndFor
+		\State Produce summary tables
+	\end{algorithmic}
+\end{algorithm}
+
+\clearpage
+% ----------------------------------------------------------------------
+\section{Additional Kimberley Results}
+\label{app:kimberley-results}
+% ----------------------------------------------------------------------
+%\setcounter{table}{0} 
+%\renewcommand{\thetable}{\Alph{section}.\arabic{table}}
+
+This appendix reports the complete eigenvalue diagnostics and kriging
+performance summaries for all Kimberley streams considered in
+Sect.~\ref{sec:real-data}. These results support the summary
+conclusions presented in the main text and illustrate the consistency
+of the observed behaviour across stream configurations.
+
+\subsection*{Eigenvalue Diagnostics}
+
+  
+\begin{table}[htbp]
+	\centering
+	\caption{Extended spectral diagnostics for Stream 2 and Cu.}
+	\label{tab:extended_eigen_stream_2_Cu}
+	\begin{tabular}{lrrrrrr}
+		\hline
+		Scenario & Min eigenvalue & Neg. count & $\sum |\lambda_i^-|$ & Mean align. & Max align. & $\kappa(C,U)$ \\
+		\hline
+		Mild (Boundary-type) & 0.101 & 0 & 0.000 & 0.000 & 0.000 & 0.0000 \\
+		Moderate (Patchwise-type) & 0.094 & 0 & 0.000 & 0.000 & 0.000 & 0.0000 \\
+		High (Local inconsistency) & -0.387 & 240 & 31.180 & 0.012 & 0.027 & 0.0002 \\
+		\hline
+	\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+	\centering
+	\caption{Extended spectral diagnostics for Stream 3 and Cu.}
+	\label{tab:extended_eigen_stream_3_Cu}
+	\begin{tabular}{lrrrrrr}
+		\hline
+		Scenario & Min eigenvalue & Neg. count & $\sum |\lambda_i^-|$ & Mean align. & Max align. & $\kappa(C,U)$ \\
+		\hline
+		Mild (Boundary-type) & 0.117 & 0 & 0.000 & 0.000 & 0.000 & 0.0000 \\
+		Moderate (Patchwise-type) & 0.093 & 0 & 0.000 & 0.000 & 0.000 & 0.0000 \\
+		High (Local inconsistency) & -0.367 & 105 & 12.805 & 0.019 & 0.046 & 0.0005 \\
+		\hline
+	\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+	\centering
+	\caption{Extended spectral diagnostics for Stream 4 and Cu.}
+	\label{tab:extended_eigen_stream_4_Cu}
+	\begin{tabular}{lrrrrrr}
+		\hline
+		Scenario & Min eigenvalue & Neg. count & $\sum |\lambda_i^-|$ & Mean align. & Max align. & $\kappa(C,U)$ \\
+		\hline
+		Mild (Boundary-type) & 0.115 & 0 & 0.000 & 0.000 & 0.000 & 0.0000 \\
+		Moderate (Patchwise-type) & 0.094 & 0 & 0.000 & 0.000 & 0.000 & 0.0000 \\
+		High (Local inconsistency) & -0.346 & 100 & 12.008 & 0.020 & 0.033 & 0.0002 \\
+		\hline
+	\end{tabular}
+\end{table}
+
+\clearpage
+\subsection*{Kriging Performance}
+
+\begin{table}[htbp]
+	\centering
+	\caption{Kriging performance for Stream 2 and Cu.}
+	\label{tab:performance_stream_2_Cu}
+	\begin{tabular}{llrrrr}
+		\hline
+		Scenario & Method & RMSE & MAE & Neg. vars. & Min var. \\
+		\hline
+		Mild & Raw indefinite & 1.895 & 0.427 & 0/20 & 0.121 \\
+		& Global PSD & 1.895 & 0.427 & 0/20 & 0.121 \\
+		& Subspace PSD & 1.895 & 0.427 & 0/20 & 0.121 \\
+		\hline
+		Moderate & Raw indefinite & 1.459 & 1.022 & 0/20 & 0.014 \\
+		& Global PSD & 1.459 & 1.022 & 0/20 & 0.014 \\
+		& Subspace PSD & 1.459 & 1.022 & 0/20 & 0.014 \\
+		\hline
+		High & Raw indefinite & 104.592 & 69.995 & 1/20 & -0.077 \\
+		& Global PSD & 638.244 & 473.861 & 20/20 & -19.317 \\
+		& Subspace PSD & 104.592 & 69.995 & 1/20 & -0.077 \\
+		\hline
+	\end{tabular}
+\end{table}
+
+
+\begin{table}[htbp]
+\centering
+\caption{Kriging performance for Stream 3 and Cu.}
+\label{tab:performance_stream_3_Cu}
+\begin{tabular}{llrrrr}
+	\hline
+	Scenario & Method & RMSE & MAE & Neg. vars. & Min var. \\
+	\hline
+	Mild & Raw indefinite & 0.088 & 0.032 & 0/20 & 0.149 \\
+	& Global PSD & 0.088 & 0.032 & 0/20 & 0.149 \\
+	& Subspace PSD & 0.088 & 0.032 & 0/20 & 0.149 \\
+	\hline
+	Moderate & Raw indefinite & 0.959 & 0.750 & 0/20 & 0.054 \\
+	& Global PSD & 0.959 & 0.750 & 0/20 & 0.054 \\
+	& Subspace PSD & 0.959 & 0.750 & 0/20 & 0.054 \\
+	\hline
+	High & Raw indefinite & 110.580 & 80.886 & 1/20 & -0.022 \\
+	& Global PSD & 683.371 & 492.972 & 19/20 & -32.022 \\
+	& Subspace PSD & 110.580 & 80.886 & 1/20 & -0.022 \\
+	\hline
+\end{tabular}
+\end{table}
+
+
+\begin{table}[htbp]
+\centering
+\caption{Kriging performance for Stream 4 and Cu.}
+\label{tab:performance_stream_4_Cu}
+\begin{tabular}{llrrrr}
+	\hline
+	Scenario & Method & RMSE & MAE & Neg. vars. & Min var. \\
+	\hline
+	Mild & Raw indefinite & 0.088 & 0.032 & 0/20 & 0.149 \\
+	& Global PSD & 0.088 & 0.032 & 0/20 & 0.149 \\
+	& Subspace PSD & 0.088 & 0.032 & 0/20 & 0.149 \\
+	\hline
+	Moderate & Raw indefinite & 0.959 & 0.750 & 0/20 & 0.054 \\
+	& Global PSD & 0.959 & 0.750 & 0/20 & 0.054 \\
+	& Subspace PSD & 0.959 & 0.750 & 0/20 & 0.054 \\
+	\hline
+	High & Raw indefinite & 110.580 & 80.886 & 1/20 & -0.022 \\
+	& Global PSD & 683.371 & 492.972 & 19/20 & -32.022 \\
+	& Subspace PSD & 110.580 & 80.886 & 1/20 & -0.022 \\
+	\hline
+\end{tabular}
+\end{table}
+
+\clearpage
+\subsection*{Spectral and Prediction Diagnostics}
+
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=1.0\textwidth]{Fig2.eps}
+	\caption{Spectral and prediction diagnostics for Stream~2 and Cu. Rows correspond to mild, moderate, and high perturbations; columns show eigenvalue spectra, kriging variance histograms (raw indefinite vs subspace PSD), and raw vs subspace PSD predictions.}
+	\label{fig:summary_stream2_cu}
+\end{figure}
+
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=1.0\textwidth]{Fig3.eps}
+	\caption{Spectral and prediction diagnostics for Stream~3 and Cu. Rows correspond to mild, moderate, and high perturbations; columns show eigenvalue spectra, kriging variance histograms (raw indefinite vs subspace PSD), and raw vs subspace PSD predictions.}
+	\label{fig:summary_stream3_cu}
+\end{figure}
+
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=1.0\textwidth]{Fig4.eps}
+	\caption{Spectral and prediction diagnostics for Stream~4 and Cu. Rows correspond to mild, moderate, and high perturbations; columns show eigenvalue spectra, kriging variance histograms (raw indefinite vs subspace PSD), and raw vs subspace PSD predictions.}
+	\label{fig:summary_stream4_cu}
+\end{figure}
+
+
+\end{document}
